@@ -2,6 +2,7 @@
 
 import sys
 import time
+import uuid
 from mitmproxy import http, ctx
 from mitmproxy.addons import eventstore
 
@@ -22,20 +23,27 @@ class ProxyAddon:
         """Handle incoming request."""
         headers = {k: v for k, v in flow.request.headers.items()}
 
+        # Generate request ID
+        request_id = str(uuid.uuid4())
+
         # Record start time
         start_time = time.time()
 
-        request_id = self.storage.save_request(
+        # Add request ID to request headers
+        flow.request.headers["X-Request-ID"] = request_id
+
+        # Save to storage with modified headers
+        request_db_id = self.storage.save_request(
             url=str(flow.request.pretty_url),
             method=flow.request.method,
-            headers=headers,
+            headers=dict(flow.request.headers),
             body=flow.request.content,
         )
 
         # Store request_id and start time
-        self._request_map[id(flow)] = (request_id, start_time)
+        self._request_map[id(flow)] = (request_db_id, start_time, request_id)
 
-        print(f"[+] Request: {flow.request.method} {flow.request.pretty_url}", file=sys.stderr)
+        print(f"[+] Request: {flow.request.method} {flow.request.pretty_url} [ID: {request_id[:8]}]", file=sys.stderr)
 
     def response(self, flow: http.HTTPFlow):
         """Handle outgoing response."""
@@ -43,10 +51,13 @@ class ProxyAddon:
         if data is None:
             return
 
-        request_id, start_time = data
+        request_db_id, start_time, request_id = data
         response_time = time.time()
 
         headers = {k: v for k, v in flow.response.headers.items()}
+
+        # Add request ID to response
+        flow.response.headers["X-Request-ID"] = request_id
 
         # Add timing headers to response
         flow.response.headers["X-Request-Start-Time"] = str(start_time)
@@ -57,14 +68,14 @@ class ProxyAddon:
         flow.response.headers["X-Elapsed-Time"] = f"{elapsed:.3f}s"
 
         self.storage.save_response(
-            request_id=request_id,
+            request_id=request_db_id,
             status_code=flow.response.status_code,
             headers=headers,
             body=flow.response.content,
             request_start_time=str(start_time),
             response_time=str(response_time),
         )
-        print(f"[+] Response: {flow.response.status_code} (elapsed: {elapsed:.3f}s)", file=sys.stderr)
+        print(f"[+] Response: {flow.response.status_code} [ID: {request_id[:8]}] (elapsed: {elapsed:.3f}s)", file=sys.stderr)
 
 
 # Global addon instance - will be initialized by load()

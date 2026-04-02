@@ -108,6 +108,7 @@ class Storage:
         response_header: Optional[tuple[str, str]] = None,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
+        seconds: Optional[int] = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """Query requests with filters."""
@@ -157,6 +158,12 @@ class Storage:
         if end_time:
             query += " AND r.timestamp <= ?"
             params.append(end_time.isoformat())
+
+        if seconds is not None:
+            from datetime import timedelta
+            since = datetime.now() - timedelta(seconds=seconds)
+            query += " AND r.timestamp >= ?"
+            params.append(since.isoformat())
 
         query += " ORDER BY r.timestamp DESC LIMIT ?"
         params.append(limit)

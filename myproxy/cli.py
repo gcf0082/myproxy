@@ -76,15 +76,19 @@ def start(port: int, db: str | None):
     help="Filter requests before this time (ISO format: 2024-01-01T23:59:59)",
 )
 @click.option(
-    "--limit",
-    default=100,
+    "--seconds",
     type=int,
-    help="Maximum number of results (default: 100)",
+    help="Filter requests within last N seconds",
 )
 @click.option(
-    "--verbose",
-    is_flag=True,
-    help="Show full details for each request/response",
+    "--limit",
+    default=10,
+    type=int,
+    help="Maximum number of results (default: 10)",
+)
+@click.option(
+    "--fields",
+    help="Fields to display (comma-separated: method,url,req_headers,req_body,req_size,resp_headers,resp_body,resp_size,status)",
 )
 def query(
     db: str | None,
@@ -95,8 +99,9 @@ def query(
     response_header: str | None,
     start_time: str | None,
     end_time: str | None,
+    seconds: int | None,
     limit: int,
-    verbose: bool,
+    fields: str | None,
 ):
     """Query captured requests and responses."""
     if db is None:
@@ -110,8 +115,9 @@ def query(
         response_header=response_header,
         start_time=start_time,
         end_time=end_time,
+        seconds=seconds,
         limit=limit,
-        verbose=verbose,
+        fields=fields,
     )
 
 

@@ -1,10 +1,17 @@
 """Query module for filtering and displaying proxy data."""
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from myproxy.storage import Storage
+
+
+# Default fields to display
+DEFAULT_FIELDS = ["method", "url", "req_size", "resp_size", "status"]
+
+# All available fields
+ALL_FIELDS = ["method", "url", "req_headers", "req_body", "req_size", "resp_headers", "resp_body", "resp_size", "status"]
 
 
 def query_requests(
@@ -16,8 +23,9 @@ def query_requests(
     response_header: Optional[str] = None,
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
-    limit: int = 100,
-    verbose: bool = False,
+    seconds: Optional[int] = None,
+    limit: int = 10,
+    fields: Optional[str] = None,
 ):
     """Query requests with filters and display results."""
     storage = Storage(db_path)
@@ -52,6 +60,7 @@ def query_requests(
         response_header=resp_header,
         start_time=start_dt,
         end_time=end_dt,
+        seconds=seconds,
         limit=limit,
     )
 
@@ -59,72 +68,47 @@ def query_requests(
         print("No results found.")
         return
 
-    if verbose:
-        _print_verbose(results)
-    else:
-        _print_summary(results)
+    # Parse fields
+    display_fields = DEFAULT_FIELDS
+    if fields:
+        display_fields = [f.strip() for f in fields.split(",")]
+
+    _print_custom(results, display_fields)
 
 
-def _print_summary(results: list[dict[str, Any]]):
-    """Print summary table of results."""
-    print(f"{'ID':<6} {'Method':<8} {'Status':<8} {'URL':<60} {'Timestamp':<20}")
-    print("-" * 110)
-
+def _print_custom(results: list[dict[str, Any]], fields: list[str]):
+    """Print results with custom fields."""
     for row in results:
-        url = row["url"]
-        if len(url) > 57:
-            url = url[:57] + "..."
+        # Calculate body sizes
+        req_size = len(row.get("request_body") or b"")
+        resp_size = len(row.get("response_body") or b"")
 
-        status = str(row.get("status_code", "N/A"))
+        line_parts = []
+        for f in fields:
+            if f == "method":
+                line_parts.append(row.get("method", ""))
+            elif f == "url":
+                url = row.get("url", "")
+                if len(url) > 50:
+                    url = url[:47] + "..."
+                line_parts.append(url)
+            elif f == "req_headers":
+                headers = row.get("request_headers", {})
+                line_parts.append(str(headers))
+            elif f == "req_body":
+                body = row.get("request_body", b"")
+                line_parts.append(str(body)[:100] if body else "")
+            elif f == "req_size":
+                line_parts.append(str(req_size))
+            elif f == "resp_headers":
+                headers = row.get("response_headers", {})
+                line_parts.append(str(headers))
+            elif f == "resp_body":
+                body = row.get("response_body", b"")
+                line_parts.append(str(body)[:100] if body else "")
+            elif f == "resp_size":
+                line_parts.append(str(resp_size))
+            elif f == "status":
+                line_parts.append(str(row.get("status_code", "N/A")))
 
-        print(
-            f"{row['id']:<6} {row['method']:<8} {status:<8} {url:<60} {row['request_timestamp'][:19]:<20}"
-        )
-
-
-def _print_verbose(results: list[dict[str, Any]]):
-    """Print detailed view of results."""
-    for i, row in enumerate(results):
-        print(f"\n{'=' * 80}")
-        print(f"Request #{row['id']}")
-        print(f"{'=' * 80}")
-
-        print(f"\n[Request]")
-        print(f"  Method:     {row['method']}")
-        print(f"  URL:        {row['url']}")
-        print(f"  Timestamp:  {row['request_timestamp']}")
-
-        print(f"\n  Headers:")
-        for key, value in row.get("request_headers", {}).items():
-            print(f"    {key}: {value}")
-
-        if row.get("request_body"):
-            print(f"\n  Body: {row['request_body'][:500]}")
-
-        status = row.get("status_code")
-        if status:
-            print(f"\n[Response]")
-            print(f"  Status Code:      {status}")
-            print(f"  Timestamp:        {row.get('response_timestamp', 'N/A')}")
-
-            # Display timing information
-            request_start = row.get("request_start_time")
-            response_time = row.get("response_time")
-            if request_start and response_time:
-                try:
-                    elapsed = float(response_time) - float(request_start)
-                    print(f"  Request Start:    {request_start}")
-                    print(f"  Response Time:   {response_time}")
-                    print(f"  Elapsed:          {elapsed:.3f}s")
-                except (ValueError, TypeError):
-                    pass
-
-            print(f"\n  Headers:")
-            for key, value in row.get("response_headers", {}).items():
-                print(f"    {key}: {value}")
-
-            if row.get("response_body"):
-                print(f"\n  Body: {row['response_body'][:500]}")
-
-        if i < len(results) - 1:
-            print("\n")
+        print(" | ".join(line_parts))

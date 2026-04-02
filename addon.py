@@ -52,7 +52,7 @@ class ProxyAddon:
 
         headers = {k: v for k, v in flow.response.headers.items()}
 
-        # Add request ID to response
+        # Add correlation ID to response
         flow.response.headers["X-Request-ID"] = request_id
 
         # Add timing headers to response

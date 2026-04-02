@@ -1,6 +1,8 @@
 """mitmproxy addon for intercepting and storing HTTP/HTTPS traffic."""
 
 import sys
+import time
+import uuid
 from mitmproxy import http, ctx
 
 from myproxy.storage import Storage
@@ -11,37 +13,63 @@ class ProxyAddon:
 
     def __init__(self, storage: Storage):
         self.storage = storage
-        self._request_map: dict[int, int] = {}  # flow_id -> request_id
+        self._request_map: dict[int, tuple] = {}  # flow_id -> (request_db_id, start_time, request_id)
 
     def request(self, flow: http.HTTPFlow):
         """Handle incoming request."""
         headers = {k: v for k, v in flow.request.headers.items()}
 
-        request_id = self.storage.save_request(
+        # Generate request ID
+        request_id = str(uuid.uuid4())
+
+        # Record start time
+        start_time = time.time()
+
+        # Add request ID to request headers
+        flow.request.headers["X-Request-ID"] = request_id
+
+        request_db_id = self.storage.save_request(
             url=str(flow.request.pretty_url),
             method=flow.request.method,
-            headers=headers,
+            headers=dict(flow.request.headers),
             body=flow.request.content,
         )
 
-        self._request_map[id(flow)] = request_id
-        print(f"[+] Request: {flow.request.method} {flow.request.pretty_url}", file=sys.stderr)
+        # Store request_id and start time
+        self._request_map[id(flow)] = (request_db_id, start_time, request_id)
+        print(f"[+] Request: {flow.request.method} {flow.request.pretty_url} [ID: {request_id[:8]}]", file=sys.stderr)
 
     def response(self, flow: http.HTTPFlow):
         """Handle outgoing response."""
-        request_id = self._request_map.get(id(flow))
-        if request_id is None:
+        data = self._request_map.get(id(flow))
+        if data is None:
             return
+
+        request_db_id, start_time, request_id = data
+        response_time = time.time()
 
         headers = {k: v for k, v in flow.response.headers.items()}
 
+        # Add correlation ID to response
+        flow.response.headers["X-Request-ID"] = request_id
+
+        # Add timing headers to response
+        flow.response.headers["X-Request-Start-Time"] = str(start_time)
+        flow.response.headers["X-Response-Time"] = str(response_time)
+
+        # Calculate elapsed time
+        elapsed = response_time - start_time
+        flow.response.headers["X-Elapsed-Time"] = f"{elapsed:.3f}s"
+
         self.storage.save_response(
-            request_id=request_id,
+            request_id=request_db_id,
             status_code=flow.response.status_code,
             headers=headers,
             body=flow.response.content,
+            request_start_time=str(start_time),
+            response_time=str(response_time),
         )
-        print(f"[+] Response: {flow.response.status_code} for {flow.request.pretty_url}", file=sys.stderr)
+        print(f"[+] Response: {flow.response.status_code} [ID: {request_id[:8]}] (elapsed: {elapsed:.3f}s)", file=sys.stderr)
 
 
 def run_proxy(port: int = 8080, db_path: str = "proxy.db"):

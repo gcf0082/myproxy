@@ -13,6 +13,9 @@ DEFAULT_FIELDS = ["method", "url", "req_size", "resp_size", "status"]
 # All available fields
 ALL_FIELDS = ["method", "url", "req_headers", "req_body", "req_size", "resp_headers", "resp_body", "resp_size", "status"]
 
+# Body truncation threshold
+BODY_TRUNCATE_SIZE = 1024
+
 
 def query_requests(
     db_path: str = "proxy.db",
@@ -76,6 +79,17 @@ def query_requests(
     _print_custom(results, display_fields)
 
 
+def _truncate_body(body: bytes | str) -> str:
+    """Truncate body if larger than threshold, append '...' if truncated."""
+    if not body:
+        return ""
+
+    body_str = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
+    if len(body_str) > BODY_TRUNCATE_SIZE:
+        return body_str[:BODY_TRUNCATE_SIZE] + "... (truncated)"
+    return body_str
+
+
 def _print_custom(results: list[dict[str, Any]], fields: list[str]):
     """Print results with custom fields."""
     for row in results:
@@ -88,24 +102,21 @@ def _print_custom(results: list[dict[str, Any]], fields: list[str]):
             if f == "method":
                 line_parts.append(row.get("method", ""))
             elif f == "url":
-                url = row.get("url", "")
-                if len(url) > 50:
-                    url = url[:47] + "..."
-                line_parts.append(url)
+                line_parts.append(row.get("url", ""))
             elif f == "req_headers":
                 headers = row.get("request_headers", {})
-                line_parts.append(str(headers))
+                line_parts.append(json.dumps(headers, indent=2))
             elif f == "req_body":
                 body = row.get("request_body", b"")
-                line_parts.append(str(body)[:100] if body else "")
+                line_parts.append(_truncate_body(body))
             elif f == "req_size":
                 line_parts.append(str(req_size))
             elif f == "resp_headers":
                 headers = row.get("response_headers", {})
-                line_parts.append(str(headers))
+                line_parts.append(json.dumps(headers, indent=2))
             elif f == "resp_body":
                 body = row.get("response_body", b"")
-                line_parts.append(str(body)[:100] if body else "")
+                line_parts.append(_truncate_body(body))
             elif f == "resp_size":
                 line_parts.append(str(resp_size))
             elif f == "status":

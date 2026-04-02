@@ -8,13 +8,24 @@ from myproxy.storage import Storage
 
 
 # Default fields to display
-DEFAULT_FIELDS = ["method", "url", "req_size", "resp_size", "status"]
+DEFAULT_FIELDS = ["method", "url", "req_time", "req_size", "resp_size", "status"]
 
 # All available fields
-ALL_FIELDS = ["method", "url", "req_headers", "req_body", "req_size", "resp_headers", "resp_body", "resp_size", "status"]
+ALL_FIELDS = ["method", "url", "req_time", "req_headers", "req_body", "req_size", "resp_headers", "resp_body", "resp_size", "status"]
 
 # Body truncation threshold
 BODY_TRUNCATE_SIZE = 1024
+
+
+def _format_time(timestamp: str) -> str:
+    """Format timestamp to human-readable format with millisecond precision."""
+    if not timestamp:
+        return ""
+    try:
+        dt = datetime.fromisoformat(timestamp)
+        return dt.strftime("%Y-%m-%d %H:%M:%S") + f".{dt.microsecond // 1000:03d}"
+    except (ValueError, TypeError):
+        return timestamp
 
 
 def query_requests(
@@ -113,6 +124,8 @@ def _print_custom(results: list[dict[str, Any]], fields: list[str]):
                 output["method"] = row.get("method", "")
             elif f == "url":
                 output["url"] = row.get("url", "")
+            elif f == "req_time":
+                output["req_time"] = _format_time(row.get("request_timestamp", ""))
             elif f == "req_headers":
                 output["req_headers"] = row.get("request_headers", {})
             elif f == "req_body":

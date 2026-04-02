@@ -21,11 +21,13 @@ def cli():
 )
 @click.option(
     "--db",
-    default="proxy.db",
-    help="Database path (default: proxy.db)",
+    default=None,
+    help="Database path (default: proxy.db in current directory)",
 )
-def start(port: int, db: str):
+def start(port: int, db: str | None):
     """Start the proxy server."""
+    if db is None:
+        db = "proxy.db"
     click.echo(f"Starting proxy on port {port}...")
     click.echo(f"Database: {db}")
     click.echo("Make sure to install the mitmproxy CA certificate.")
@@ -37,8 +39,8 @@ def start(port: int, db: str):
 @cli.command()
 @click.option(
     "--db",
-    default="proxy.db",
-    help="Database path (default: proxy.db)",
+    default=None,
+    help="Database path (default: proxy.db in current directory)",
 )
 @click.option(
     "--url",
@@ -85,7 +87,7 @@ def start(port: int, db: str):
     help="Show full details for each request/response",
 )
 def query(
-    db: str,
+    db: str | None,
     url_contains: str | None,
     method: str | None,
     status_code: int | None,
@@ -97,6 +99,8 @@ def query(
     verbose: bool,
 ):
     """Query captured requests and responses."""
+    if db is None:
+        db = "proxy.db"
     query_requests(
         db_path=db,
         url_contains=url_contains,

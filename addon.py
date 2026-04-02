@@ -1,6 +1,7 @@
 """Standalone addon script for mitmproxy."""
 
 import sys
+import time
 from mitmproxy import http, ctx
 from mitmproxy.addons import eventstore
 
@@ -15,11 +16,14 @@ class ProxyAddon:
 
     def __init__(self, storage: Storage):
         self.storage = storage
-        self._request_map = {}  # flow_id -> request_id
+        self._request_map = {}  # flow_id -> (request_id, start_time)
 
     def request(self, flow: http.HTTPFlow):
         """Handle incoming request."""
         headers = {k: v for k, v in flow.request.headers.items()}
+
+        # Record start time
+        start_time = time.time()
 
         request_id = self.storage.save_request(
             url=str(flow.request.pretty_url),
@@ -28,24 +32,39 @@ class ProxyAddon:
             body=flow.request.content,
         )
 
-        self._request_map[id(flow)] = request_id
+        # Store request_id and start time
+        self._request_map[id(flow)] = (request_id, start_time)
+
         print(f"[+] Request: {flow.request.method} {flow.request.pretty_url}", file=sys.stderr)
 
     def response(self, flow: http.HTTPFlow):
         """Handle outgoing response."""
-        request_id = self._request_map.get(id(flow))
-        if request_id is None:
+        data = self._request_map.get(id(flow))
+        if data is None:
             return
 
+        request_id, start_time = data
+        response_time = time.time()
+
         headers = {k: v for k, v in flow.response.headers.items()}
+
+        # Add timing headers to response
+        flow.response.headers["X-Request-Start-Time"] = str(start_time)
+        flow.response.headers["X-Response-Time"] = str(response_time)
+
+        # Calculate elapsed time
+        elapsed = response_time - start_time
+        flow.response.headers["X-Elapsed-Time"] = f"{elapsed:.3f}s"
 
         self.storage.save_response(
             request_id=request_id,
             status_code=flow.response.status_code,
             headers=headers,
             body=flow.response.content,
+            request_start_time=str(start_time),
+            response_time=str(response_time),
         )
-        print(f"[+] Response: {flow.response.status_code}", file=sys.stderr)
+        print(f"[+] Response: {flow.response.status_code} (elapsed: {elapsed:.3f}s)", file=sys.stderr)
 
 
 # Global addon instance - will be initialized by load()

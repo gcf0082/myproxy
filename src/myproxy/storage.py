@@ -38,6 +38,8 @@ class Storage:
                 headers TEXT,
                 body BLOB,
                 timestamp TEXT NOT NULL,
+                request_start_time TEXT,
+                response_time TEXT,
                 FOREIGN KEY (request_id) REFERENCES requests (id)
             )
         """)
@@ -76,6 +78,8 @@ class Storage:
         status_code: int,
         headers: dict[str, str],
         body: Optional[bytes] = None,
+        request_start_time: Optional[str] = None,
+        response_time: Optional[str] = None,
     ) -> int:
         """Save a response to the database."""
         conn = sqlite3.connect(self.db_path)
@@ -85,8 +89,8 @@ class Storage:
         headers_json = json.dumps(dict(headers))
 
         cursor.execute(
-            "INSERT INTO responses (request_id, status_code, headers, body, timestamp) VALUES (?, ?, ?, ?, ?)",
-            (request_id, status_code, headers_json, body, timestamp),
+            "INSERT INTO responses (request_id, status_code, headers, body, timestamp, request_start_time, response_time) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (request_id, status_code, headers_json, body, timestamp, request_start_time, response_time),
         )
 
         response_id = cursor.lastrowid
@@ -115,7 +119,8 @@ class Storage:
             SELECT r.id, r.url, r.method, r.headers as request_headers,
                    r.body as request_body, r.timestamp as request_timestamp,
                    res.status_code, res.headers as response_headers,
-                   res.body as response_body, res.timestamp as response_timestamp
+                   res.body as response_body, res.timestamp as response_timestamp,
+                   res.request_start_time, res.response_time
             FROM requests r
             LEFT JOIN responses res ON r.id = res.request_id
             WHERE 1=1

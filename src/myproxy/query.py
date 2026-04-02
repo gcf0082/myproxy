@@ -104,8 +104,20 @@ def _print_verbose(results: list[dict[str, Any]]):
         status = row.get("status_code")
         if status:
             print(f"\n[Response]")
-            print(f"  Status Code: {status}")
-            print(f"  Timestamp:   {row.get('response_timestamp', 'N/A')}")
+            print(f"  Status Code:      {status}")
+            print(f"  Timestamp:        {row.get('response_timestamp', 'N/A')}")
+
+            # Display timing information
+            request_start = row.get("request_start_time")
+            response_time = row.get("response_time")
+            if request_start and response_time:
+                try:
+                    elapsed = float(response_time) - float(request_start)
+                    print(f"  Request Start:    {request_start}")
+                    print(f"  Response Time:   {response_time}")
+                    print(f"  Elapsed:          {elapsed:.3f}s")
+                except (ValueError, TypeError):
+                    pass
 
             print(f"\n  Headers:")
             for key, value in row.get("response_headers", {}).items():

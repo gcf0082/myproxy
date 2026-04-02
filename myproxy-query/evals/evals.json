@@ -1,0 +1,23 @@
+{
+  "skill_name": "myproxy-query",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "查看最近10条请求记录",
+      "expected_output": "JSONL格式输出，包含method,url,req_time,req_size,resp_size,status字段",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "查询最近60秒的POST请求",
+      "expected_output": "过滤出method为POST且在最近60秒内的记录",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "查看包含请求体和响应体的记录",
+      "expected_output": "输出包含req_body和resp_body字段的JSONL记录",
+      "files": []
+    }
+  ]
+}

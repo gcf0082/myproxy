@@ -10,4 +10,4 @@ echo "Make sure to install the mitmproxy CA certificate."
 echo "Visit http://mitm.it to download certificates."
 echo ""
 
-mitmdump --listen-port "$PORT" --set confpath="$CONF" -s addon.py
+mitmdump --listen-port "$PORT" --set confpath="$CONF" --set ssl_insecure=true -s addon.py

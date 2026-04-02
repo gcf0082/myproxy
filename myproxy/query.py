@@ -90,36 +90,42 @@ def _truncate_body(body: bytes | str) -> str:
     return body_str
 
 
+def _format_value(value: Any, field: str) -> Any:
+    """Format value based on field type."""
+    if field in ("req_headers", "resp_headers"):
+        return value or {}
+    if field in ("req_body", "resp_body"):
+        body = value or b""
+        return _truncate_body(body)
+    return value
+
+
 def _print_custom(results: list[dict[str, Any]], fields: list[str]):
-    """Print results with custom fields."""
+    """Print results in JSONL format (one JSON object per line)."""
     for row in results:
         # Calculate body sizes
         req_size = len(row.get("request_body") or b"")
         resp_size = len(row.get("response_body") or b"")
 
-        line_parts = []
+        output = {}
         for f in fields:
             if f == "method":
-                line_parts.append(row.get("method", ""))
+                output["method"] = row.get("method", "")
             elif f == "url":
-                line_parts.append(row.get("url", ""))
+                output["url"] = row.get("url", "")
             elif f == "req_headers":
-                headers = row.get("request_headers", {})
-                line_parts.append(json.dumps(headers, indent=2))
+                output["req_headers"] = row.get("request_headers", {})
             elif f == "req_body":
-                body = row.get("request_body", b"")
-                line_parts.append(_truncate_body(body))
+                output["req_body"] = _truncate_body(row.get("request_body", b""))
             elif f == "req_size":
-                line_parts.append(str(req_size))
+                output["req_size"] = req_size
             elif f == "resp_headers":
-                headers = row.get("response_headers", {})
-                line_parts.append(json.dumps(headers, indent=2))
+                output["resp_headers"] = row.get("response_headers", {})
             elif f == "resp_body":
-                body = row.get("response_body", b"")
-                line_parts.append(_truncate_body(body))
+                output["resp_body"] = _truncate_body(row.get("response_body", b""))
             elif f == "resp_size":
-                line_parts.append(str(resp_size))
+                output["resp_size"] = resp_size
             elif f == "status":
-                line_parts.append(str(row.get("status_code", "N/A")))
+                output["status"] = row.get("status_code", "")
 
-        print(" | ".join(line_parts))
+        print(json.dumps(output, ensure_ascii=False))

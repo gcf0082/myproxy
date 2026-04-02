@@ -4,10 +4,6 @@ import sys
 import time
 import uuid
 from mitmproxy import http, ctx
-from mitmproxy.addons import eventstore
-
-# Add src to path
-sys.path.insert(0, "/root/projects/myproxy/src")
 
 from myproxy.storage import Storage
 

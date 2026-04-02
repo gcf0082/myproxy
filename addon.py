@@ -6,17 +6,27 @@ import uuid
 from mitmproxy import http, ctx
 
 from myproxy.storage import Storage
+from myproxy.config import get_config
 
 
 class ProxyAddon:
     """mitmproxy addon to capture requests and responses."""
 
-    def __init__(self, storage: Storage):
+    def __init__(self, storage: Storage, config_path: str = None):
         self.storage = storage
         self._request_map = {}  # flow_id -> (request_id, start_time)
+        from myproxy.config import load_config
+        self.config = load_config(config_path)
 
     def request(self, flow: http.HTTPFlow):
         """Handle incoming request."""
+        url = str(flow.request.pretty_url)
+
+        # Check if URL should be recorded
+        if not self.config.should_record(url):
+            print(f"[~] Skipped: {flow.request.method} {url}", file=sys.stderr)
+            return
+
         headers = {k: v for k, v in flow.request.headers.items()}
 
         # Generate request ID
@@ -87,6 +97,10 @@ def load(loader):
         "dbpath", str, "proxy.db",
         "Path to SQLite database"
     )
+    loader.add_option(
+        "confpath", str, "config.yaml",
+        "Path to filter config file"
+    )
 
 
 def configure(updated):
@@ -95,9 +109,10 @@ def configure(updated):
 
     if "dbpath" in updated and addon is None:
         db_path = ctx.options.dbpath
+        conf_path = ctx.options.confpath
         storage = Storage(db_path)
-        addon = ProxyAddon(storage)
-        print(f"[*] Proxy addon loaded, database: {db_path}", file=sys.stderr)
+        addon = ProxyAddon(storage, conf_path)
+        print(f"[*] Proxy addon loaded, database: {db_path}, config: {conf_path}", file=sys.stderr)
 
 
 def request(flow):

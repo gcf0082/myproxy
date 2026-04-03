@@ -182,3 +182,34 @@ class Storage:
             results.append(result)
 
         return results
+
+    def get_by_id(self, request_id: int) -> Optional[dict[str, Any]]:
+        """Get a specific request by ID."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT r.id, r.url, r.method, r.headers as request_headers,
+                   r.body as request_body, r.timestamp as request_timestamp,
+                   res.id as response_id, res.status_code, res.headers as response_headers,
+                   res.body as response_body, res.timestamp as response_timestamp,
+                   res.request_start_time, res.response_time
+            FROM requests r
+            LEFT JOIN responses res ON r.id = res.request_id
+            WHERE r.id = ?
+        """, (request_id,))
+
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return None
+
+        result = dict(row)
+        if result.get("request_headers"):
+            result["request_headers"] = json.loads(result["request_headers"])
+        if result.get("response_headers"):
+            result["response_headers"] = json.loads(result["response_headers"])
+
+        return result

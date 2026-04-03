@@ -8,7 +8,7 @@ from myproxy.storage import Storage
 
 
 # Default fields to display
-DEFAULT_FIELDS = ["method", "url", "req_time", "req_size", "resp_size", "status"]
+DEFAULT_FIELDS = ["id", "method", "url", "req_time", "req_size", "resp_size", "status"]
 
 # All available fields
 ALL_FIELDS = ["method", "url", "req_time", "req_headers", "req_body", "req_size", "resp_headers", "resp_body", "resp_size", "status"]
@@ -40,9 +40,19 @@ def query_requests(
     seconds: Optional[int] = None,
     limit: int = 10,
     fields: Optional[str] = None,
+    request_id: Optional[int] = None,
 ):
     """Query requests with filters and display results."""
     storage = Storage(db_path)
+
+    # If request_id is provided, get by ID directly
+    if request_id is not None:
+        result = storage.get_by_id(request_id)
+        if not result:
+            print(f"No request found with ID: {request_id}")
+            return
+        _print_custom([result], ALL_FIELDS)
+        return
 
     # Parse header filters
     req_header = None
@@ -120,7 +130,9 @@ def _print_custom(results: list[dict[str, Any]], fields: list[str]):
 
         output = {}
         for f in fields:
-            if f == "method":
+            if f == "id":
+                output["id"] = row.get("id", "")
+            elif f == "method":
                 output["method"] = row.get("method", "")
             elif f == "url":
                 output["url"] = row.get("url", "")

@@ -43,6 +43,12 @@ def start(port: int, db: str | None):
     help="Database path (default: proxy.db in current directory)",
 )
 @click.option(
+    "--id",
+    "request_id",
+    type=int,
+    help="Query by request ID",
+)
+@click.option(
     "--url",
     "url_contains",
     help="Filter by URL containing this string",
@@ -88,10 +94,11 @@ def start(port: int, db: str | None):
 )
 @click.option(
     "--fields",
-    help="Fields to display (comma-separated: method,url,req_headers,req_body,req_size,resp_headers,resp_body,resp_size,status)",
+    help="Fields to display (comma-separated: id,method,url,req_headers,req_body,req_size,resp_headers,resp_body,resp_size,status)",
 )
 def query(
     db: str | None,
+    request_id: int | None,
     url_contains: str | None,
     method: str | None,
     status_code: int | None,
@@ -108,6 +115,7 @@ def query(
         db = "proxy.db"
     query_requests(
         db_path=db,
+        request_id=request_id,
         url_contains=url_contains,
         method=method,
         status_code=status_code,

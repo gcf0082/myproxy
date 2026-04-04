@@ -54,12 +54,14 @@ class Storage:
         method: str,
         headers: dict[str, str],
         body: Optional[bytes] = None,
+        request_id: Optional[str] = None,
     ) -> str:
         """Save a request to the database."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        request_id = uuid.uuid4().hex
+        if request_id is None:
+            request_id = uuid.uuid4().hex
         timestamp = datetime.now().isoformat()
         headers_json = json.dumps(dict(headers))
 

@@ -40,7 +40,6 @@ class ProxyAddon:
 
         # Save to storage with modified headers
         self.storage.save_request(
-            request_id=request_id,
             url=str(flow.request.pretty_url),
             method=flow.request.method,
             headers=dict(flow.request.headers),

@@ -29,8 +29,8 @@ class ProxyAddon:
 
         headers = {k: v for k, v in flow.request.headers.items()}
 
-        # Generate request ID
-        request_id = str(uuid.uuid4())
+        # Generate request ID (without dashes)
+        request_id = uuid.uuid4().hex
 
         # Record start time
         start_time = time.time()
@@ -39,7 +39,8 @@ class ProxyAddon:
         flow.request.headers["X-Request-ID"] = request_id
 
         # Save to storage with modified headers
-        request_db_id = self.storage.save_request(
+        self.storage.save_request(
+            request_id=request_id,
             url=str(flow.request.pretty_url),
             method=flow.request.method,
             headers=dict(flow.request.headers),
@@ -47,7 +48,7 @@ class ProxyAddon:
         )
 
         # Store request_id and start time
-        self._request_map[id(flow)] = (request_db_id, start_time, request_id)
+        self._request_map[id(flow)] = (request_id, start_time)
 
         print(f"[+] Request: {flow.request.method} {flow.request.pretty_url} [ID: {request_id[:8]}]", file=sys.stderr)
 
@@ -57,7 +58,7 @@ class ProxyAddon:
         if data is None:
             return
 
-        request_db_id, start_time, request_id = data
+        request_id, start_time = data
         response_time = time.time()
 
         headers = {k: v for k, v in flow.response.headers.items()}
@@ -74,7 +75,7 @@ class ProxyAddon:
         flow.response.headers["X-Elapsed-Time"] = f"{elapsed:.3f}s"
 
         self.storage.save_response(
-            request_id=request_db_id,
+            request_id=request_id,
             status_code=flow.response.status_code,
             headers=headers,
             body=flow.response.content,

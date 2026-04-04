@@ -43,9 +43,8 @@ def start(port: int, db: str | None):
     help="Database path (default: proxy.db in current directory)",
 )
 @click.option(
-    "--id",
+    "--request_id",
     "request_id",
-    type=int,
     help="Query by request ID",
 )
 @click.option(
@@ -94,11 +93,11 @@ def start(port: int, db: str | None):
 )
 @click.option(
     "--fields",
-    help="Fields to display (comma-separated: id,method,url,req_headers,req_body,req_size,resp_headers,resp_body,resp_size,status)",
+    help="Fields to display (comma-separated: request_id,method,url,req_headers,req_body,req_size,resp_headers,resp_body,resp_size,status)",
 )
 def query(
     db: str | None,
-    request_id: int | None,
+    request_id: str | None,
     url_contains: str | None,
     method: str | None,
     status_code: int | None,

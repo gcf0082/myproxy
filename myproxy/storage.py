@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -21,7 +22,7 @@ class Storage:
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS requests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT PRIMARY KEY,
                 url TEXT NOT NULL,
                 method TEXT NOT NULL,
                 headers TEXT,
@@ -33,7 +34,7 @@ class Storage:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS responses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                request_id INTEGER NOT NULL,
+                request_id TEXT NOT NULL,
                 status_code INTEGER,
                 headers TEXT,
                 body BLOB,
@@ -53,20 +54,20 @@ class Storage:
         method: str,
         headers: dict[str, str],
         body: Optional[bytes] = None,
-    ) -> int:
+    ) -> str:
         """Save a request to the database."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
+        request_id = uuid.uuid4().hex
         timestamp = datetime.now().isoformat()
         headers_json = json.dumps(dict(headers))
 
         cursor.execute(
-            "INSERT INTO requests (url, method, headers, body, timestamp) VALUES (?, ?, ?, ?, ?)",
-            (url, method, headers_json, body, timestamp),
+            "INSERT INTO requests (id, url, method, headers, body, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+            (request_id, url, method, headers_json, body, timestamp),
         )
 
-        request_id = cursor.lastrowid
         conn.commit()
         conn.close()
 
@@ -74,7 +75,7 @@ class Storage:
 
     def save_response(
         self,
-        request_id: int,
+        request_id: str,
         status_code: int,
         headers: dict[str, str],
         body: Optional[bytes] = None,
@@ -183,7 +184,7 @@ class Storage:
 
         return results
 
-    def get_by_id(self, request_id: int) -> Optional[dict[str, Any]]:
+    def get_by_id(self, request_id: str) -> Optional[dict[str, Any]]:
         """Get a specific request by ID."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row

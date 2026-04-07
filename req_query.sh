@@ -4,4 +4,4 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-python main.py query "$@"
+python main.py query --seconds 3600 "$@"

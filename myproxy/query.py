@@ -1,6 +1,7 @@
 """Query module for filtering and displaying proxy data."""
 
 import json
+import sys
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
@@ -8,10 +9,29 @@ from myproxy.storage import Storage
 
 
 # Default fields to display
-DEFAULT_FIELDS = ["request_id", "method", "url", "req_time", "req_size", "resp_size", "status"]
+DEFAULT_FIELDS = [
+    "request_id",
+    "method",
+    "url",
+    "req_time",
+    "req_size",
+    "resp_size",
+    "status",
+]
 
 # All available fields
-ALL_FIELDS = ["method", "url", "req_time", "req_headers", "req_body", "req_size", "resp_headers", "resp_body", "resp_size", "status"]
+ALL_FIELDS = [
+    "method",
+    "url",
+    "req_time",
+    "req_headers",
+    "req_body",
+    "req_size",
+    "resp_headers",
+    "resp_body",
+    "resp_size",
+    "status",
+]
 
 # Body truncation threshold
 BODY_TRUNCATE_SIZE = 1024
@@ -105,7 +125,9 @@ def _truncate_body(body: bytes | str) -> str:
     if not body:
         return ""
 
-    body_str = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
+    body_str = (
+        body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
+    )
     if len(body_str) > BODY_TRUNCATE_SIZE:
         return body_str[:BODY_TRUNCATE_SIZE] + "... (truncated)"
     return body_str
@@ -153,4 +175,6 @@ def _print_custom(results: list[dict[str, Any]], fields: list[str]):
             elif f == "status":
                 output["status"] = row.get("status_code", "")
 
-        print(json.dumps(output, ensure_ascii=False))
+        sys.stdout.buffer.write(
+            json.dumps(output, ensure_ascii=False).encode("utf-8") + b"\n"
+        )

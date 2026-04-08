@@ -2,7 +2,6 @@
 
 import json
 import sqlite3
-import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -54,13 +53,15 @@ class Storage:
         method: str,
         headers: dict[str, str],
         body: Optional[bytes] = None,
-        request_id: Optional[str] = None,
+        request_id: str = "",
     ) -> str:
         """Save a request to the database."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        if request_id is None:
+        if not request_id:
+            import uuid
+
             request_id = uuid.uuid4().hex
         timestamp = datetime.now().isoformat()
         headers_json = json.dumps(dict(headers))
@@ -93,7 +94,15 @@ class Storage:
 
         cursor.execute(
             "INSERT INTO responses (request_id, status_code, headers, body, timestamp, request_start_time, response_time) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (request_id, status_code, headers_json, body, timestamp, request_start_time, response_time),
+            (
+                request_id,
+                status_code,
+                headers_json,
+                body,
+                timestamp,
+                request_start_time,
+                response_time,
+            ),
         )
 
         response_id = cursor.lastrowid
@@ -152,7 +161,7 @@ class Storage:
         if response_header:
             key, value = response_header
             query += " AND res.headers LIKE ?"
-            params.append(f"%\"{key}\":\"%{value}%\"%")
+            params.append(f'%"{key}":"%{value}%"%')
 
         if start_time:
             query += " AND r.timestamp >= ?"
@@ -164,6 +173,7 @@ class Storage:
 
         if seconds is not None:
             from datetime import timedelta
+
             since = datetime.now() - timedelta(seconds=seconds)
             query += " AND r.timestamp >= ?"
             params.append(since.isoformat())
@@ -192,7 +202,8 @@ class Storage:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT r.id, r.url, r.method, r.headers as request_headers,
                    r.body as request_body, r.timestamp as request_timestamp,
                    res.id as response_id, res.status_code, res.headers as response_headers,
@@ -201,7 +212,9 @@ class Storage:
             FROM requests r
             LEFT JOIN responses res ON r.id = res.request_id
             WHERE r.id = ?
-        """, (request_id,))
+        """,
+            (request_id,),
+        )
 
         row = cursor.fetchone()
         conn.close()

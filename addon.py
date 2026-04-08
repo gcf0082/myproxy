@@ -44,6 +44,7 @@ class ProxyAddon:
             method=flow.request.method,
             headers=dict(flow.request.headers),
             body=flow.request.content,
+            request_id=request_id,
         )
 
         print(

@@ -61,31 +61,23 @@ echo "[4] 测试查询功能..."
 
 echo ""
 echo "  4.1 查询所有请求"
-python main.py query --db $DB_PATH
+./req_query.sh --limit 5
 
 echo ""
 echo "  4.2 按方法过滤 (POST)"
-python main.py query --db $DB_PATH --method POST
+./req_query.sh --method POST
 
 echo ""
 echo "  4.3 按 URL 过滤 (httpbin)"
-python main.py query --db $DB_PATH --url httpbin
+./req_query.sh --url httpbin
 
 echo ""
-echo "  4.4 按状态码过滤 (200)"
-python main.py query --db $DB_PATH --status 200
+echo "  4.4 限制结果数量 (2)"
+./req_query.sh --limit 2
 
 echo ""
-echo "  4.5 按请求头过滤 (X-Custom-Header)"
-python main.py query --db $DB_PATH --req-header "X-Custom-Header:test-value"
-
-echo ""
-echo "  4.6 限制结果数量 (2)"
-python main.py query --db $DB_PATH --limit 2
-
-echo ""
-echo "  4.7 详细输出模式"
-python main.py query --db $DB_PATH --verbose --limit 1
+echo "  4.5 查看详细数据"
+./req_query.sh --limit 1 --fields "request_id,method,url,req_headers,req_time"
 
 echo ""
 echo "========================================"

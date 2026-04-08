@@ -4,4 +4,6 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-python main.py query --seconds 3600 "$@"
+DB_PATH="/tmp/test_proxy.db"
+
+python main.py query --db "$DB_PATH" "$@"

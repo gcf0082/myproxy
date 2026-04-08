@@ -12,7 +12,7 @@ def cli():
     pass
 
 
-@cli.command()
+@click.command()
 @click.option(
     "--port",
     default=8080,
@@ -24,16 +24,22 @@ def cli():
     default=None,
     help="Database path (default: proxy.db in current directory)",
 )
-def start(port: int, db: str | None):
+@click.option(
+    "--config",
+    default="config.yaml",
+    help="Config file path (default: config.yaml)",
+)
+def start(port: int, db: str | None, config: str):
     """Start the proxy server."""
     if db is None:
         db = "proxy.db"
     click.echo(f"Starting proxy on port {port}...")
     click.echo(f"Database: {db}")
+    click.echo(f"Config: {config}")
     click.echo("Make sure to install the mitmproxy CA certificate.")
     click.echo("Visit http://mitm.it to download certificates.")
 
-    run_proxy(port=port, db_path=db)
+    run_proxy(port=port, db_path=db, config_path=config)
 
 
 @cli.command()

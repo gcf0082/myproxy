@@ -11,41 +11,51 @@ from myproxy.storage import Storage
 class ProxyAddon:
     """mitmproxy addon to capture requests and responses."""
 
-    def __init__(self, storage: Storage):
+    def __init__(self, storage: Storage, config_path: str = None):
         self.storage = storage
-        self._request_map: dict[int, tuple] = {}  # flow_id -> (request_db_id, start_time, request_id)
+        from myproxy.config import load_config
+
+        self.config = load_config(config_path)
 
     def request(self, flow: http.HTTPFlow):
         """Handle incoming request."""
+        url = str(flow.request.pretty_url)
+
+        # Check if URL should be recorded
+        if not self.config.should_record(url):
+            print(f"[~] Skipped: {flow.request.method} {url}", file=sys.stderr)
+            return
+
         headers = {k: v for k, v in flow.request.headers.items()}
 
-        # Generate request ID
-        request_id = str(uuid.uuid4())
+        # Get request ID from header or generate new one
+        request_id = flow.request.headers.get("X-Request-ID")
+        if not request_id:
+            request_id = uuid.uuid4().hex
+            flow.request.headers["X-Request-ID"] = request_id
 
         # Record start time
         start_time = time.time()
 
-        # Add request ID to request headers
-        flow.request.headers["X-Request-ID"] = request_id
-
-        request_db_id = self.storage.save_request(
+        self.storage.save_request(
             url=str(flow.request.pretty_url),
             method=flow.request.method,
             headers=dict(flow.request.headers),
             body=flow.request.content,
         )
-
-        # Store request_id and start time
-        self._request_map[id(flow)] = (request_db_id, start_time, request_id)
-        print(f"[+] Request: {flow.request.method} {flow.request.pretty_url} [ID: {request_id[:8]}]", file=sys.stderr)
+        print(
+            f"[+] Request: {flow.request.method} {flow.request.pretty_url} [ID: {request_id[:8]}]",
+            file=sys.stderr,
+        )
 
     def response(self, flow: http.HTTPFlow):
         """Handle outgoing response."""
-        data = self._request_map.get(id(flow))
-        if data is None:
+        request_id = flow.request.headers.get("X-Request-ID")
+        if not request_id:
             return
 
-        request_db_id, start_time, request_id = data
+        start_time_str = flow.request.headers.get("X-Request-Start-Time")
+        start_time = float(start_time_str) if start_time_str else time.time()
         response_time = time.time()
 
         headers = {k: v for k, v in flow.response.headers.items()}
@@ -62,20 +72,25 @@ class ProxyAddon:
         flow.response.headers["X-Elapsed-Time"] = f"{elapsed:.3f}s"
 
         self.storage.save_response(
-            request_id=request_db_id,
+            request_id=request_id,
             status_code=flow.response.status_code,
             headers=headers,
             body=flow.response.content,
             request_start_time=str(start_time),
             response_time=str(response_time),
         )
-        print(f"[+] Response: {flow.response.status_code} [ID: {request_id[:8]}] (elapsed: {elapsed:.3f}s)", file=sys.stderr)
+        print(
+            f"[+] Response: {flow.response.status_code} [ID: {request_id[:8]}] (elapsed: {elapsed:.3f}s)",
+            file=sys.stderr,
+        )
 
 
-def run_proxy(port: int = 8080, db_path: str = "proxy.db"):
+def run_proxy(
+    port: int = 8080, db_path: str = "proxy.db", config_path: str = "config.yaml"
+):
     """Run the mitmproxy server."""
     storage = Storage(db_path)
-    addon = ProxyAddon(storage)
+    addon = ProxyAddon(storage, config_path)
 
     from mitmproxy import options
     from mitmproxy.master import Master
@@ -106,12 +121,6 @@ def run_proxy(port: int = 8080, db_path: str = "proxy.db"):
         loop.close()
 
 
-# For running with mitmdump -s option
-def run_as_addon(storage: Storage):
-    """Return addon for use with mitmdump -s."""
-    return ProxyAddon(storage)
-
-
 def main():
     """Entry point when run as script with mitmdump."""
     import argparse
@@ -119,9 +128,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--db", default="proxy.db")
+    parser.add_argument("--conf", default="config.yaml")
     args = parser.parse_args()
 
-    run_proxy(port=args.port, db_path=args.db)
+    run_proxy(port=args.port, db_path=args.db, config_path=args.conf)
 
 
 if __name__ == "__main__":

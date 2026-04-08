@@ -14,8 +14,8 @@ class ProxyAddon:
 
     def __init__(self, storage: Storage, config_path: str = None):
         self.storage = storage
-        self._request_map = {}  # flow_id -> (request_id, start_time)
         from myproxy.config import load_config
+
         self.config = load_config(config_path)
 
     def request(self, flow: http.HTTPFlow):
@@ -29,14 +29,14 @@ class ProxyAddon:
 
         headers = {k: v for k, v in flow.request.headers.items()}
 
-        # Generate request ID (without dashes)
-        request_id = uuid.uuid4().hex
+        # Get request ID from header or generate new one
+        request_id = flow.request.headers.get("X-Request-ID")
+        if not request_id:
+            request_id = uuid.uuid4().hex
+            flow.request.headers["X-Request-ID"] = request_id
 
         # Record start time
         start_time = time.time()
-
-        # Add request ID to request headers
-        flow.request.headers["X-Request-ID"] = request_id
 
         # Save to storage with modified headers
         self.storage.save_request(
@@ -46,18 +46,19 @@ class ProxyAddon:
             body=flow.request.content,
         )
 
-        # Store request_id and start time
-        self._request_map[id(flow)] = (request_id, start_time)
-
-        print(f"[+] Request: {flow.request.method} {flow.request.pretty_url} [ID: {request_id[:8]}]", file=sys.stderr)
+        print(
+            f"[+] Request: {flow.request.method} {flow.request.pretty_url} [ID: {request_id[:8]}]",
+            file=sys.stderr,
+        )
 
     def response(self, flow: http.HTTPFlow):
         """Handle outgoing response."""
-        data = self._request_map.get(id(flow))
-        if data is None:
+        request_id = flow.request.headers.get("X-Request-ID")
+        if not request_id:
             return
 
-        request_id, start_time = data
+        start_time_str = flow.request.headers.get("X-Request-Start-Time")
+        start_time = float(start_time_str) if start_time_str else time.time()
         response_time = time.time()
 
         headers = {k: v for k, v in flow.response.headers.items()}
@@ -81,7 +82,10 @@ class ProxyAddon:
             request_start_time=str(start_time),
             response_time=str(response_time),
         )
-        print(f"[+] Response: {flow.response.status_code} [ID: {request_id[:8]}] (elapsed: {elapsed:.3f}s)", file=sys.stderr)
+        print(
+            f"[+] Response: {flow.response.status_code} [ID: {request_id[:8]}] (elapsed: {elapsed:.3f}s)",
+            file=sys.stderr,
+        )
 
 
 # Global addon instance - will be initialized by load()
@@ -93,14 +97,8 @@ def load(loader):
     """Load addon with options."""
     global storage, addon
 
-    loader.add_option(
-        "dbpath", str, "proxy.db",
-        "Path to SQLite database"
-    )
-    loader.add_option(
-        "confpath", str, "config.yaml",
-        "Path to filter config file"
-    )
+    loader.add_option("dbpath", str, "proxy.db", "Path to SQLite database")
+    loader.add_option("confpath", str, "config.yaml", "Path to filter config file")
 
 
 def configure(updated):
@@ -112,7 +110,10 @@ def configure(updated):
         conf_path = ctx.options.confpath
         storage = Storage(db_path)
         addon = ProxyAddon(storage, conf_path)
-        print(f"[*] Proxy addon loaded, database: {db_path}, config: {conf_path}", file=sys.stderr)
+        print(
+            f"[*] Proxy addon loaded, database: {db_path}, config: {conf_path}",
+            file=sys.stderr,
+        )
 
 
 def request(flow):
